@@ -31,7 +31,7 @@ This code example demonstrates EZ-PD&trade; PMG1-S3 device-based solution for co
 
 ## Hardware setup
 
-1. See the application note - [AN237305](https://www.infineon.com/an237305) to make all the required connections from CY7113 (PMG1-S3 prototyping kit) to the motor driver board.
+1. See the application note - [AN237305](https://www.infineon.com/an237305) to make all the required connections from CY7113 (PMG1-S3 prototyping kit) to the motor driver board.(PMG1-S3 prototyping kit CY7113 need to remove **LED5** and **LED6** to fit application note-[AN237305].)
 2. Verify the following GPIO connections mentioned in table 1.
 
 **Table 1. GPIO connections required between PMG1-S3 device and external circuit**
@@ -177,6 +177,7 @@ For a list of supported IDEs and more details, see the "Exporting to IDEs" secti
 ## Operation
 
 1. Ensure that the steps listed in the [Hardware setup](#hardware-setup) section are completed.
+   (PMG1-S3 prototyping kit CY7113 need to **remove** **LED5** and **LED6** to fit application note-[AN237305].)
 
 2. Connect the onboard power selection jumper (J5) of the PMG1 kit between 2-3 to provide power to the PMG1 device from KitProg3 USB Type-C port (J1).
 
