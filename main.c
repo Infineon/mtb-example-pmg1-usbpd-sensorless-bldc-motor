@@ -24,15 +24,16 @@
 #include "cy_pdstack_dpm.h"
 #include "cy_usbpd_vbus_ctrl.h"
 #include "cy_usbpd_phy.h"
-#include "instrumentation.h"
-#include "app.h"
-#include "pdo.h"
-#include "psink.h"
-#include "swap.h"
-#include "vdm.h"
-#include "charger_detect.h"
+#include "cy_app_instrumentation.h"
+#include "cy_app.h"
+#include "cy_app_pdo.h"
+#include "cy_app_sink.h"
+#include "cy_app_swap.h"
+#include "cy_app_vdm.h"
+#include "cy_app_battery_charging.h"
+#include "cy_app_fault_handlers.h"
 #include "mtbcfg_ezpd.h"
-
+#include "cy_app_timer_id.h"
 
 /*******************************************************************************
 * Macros
@@ -46,9 +47,13 @@ cy_stc_pdutils_sw_timer_t gl_TimerCtx;
 cy_stc_usbpd_context_t gl_UsbPdPort0Ctx;
 cy_stc_pdstack_context_t gl_PdStackPort0Ctx;
 
+/******************************************************************************
+ * Structure type declaration
+ ******************************************************************************/
+/* PD Stack DPM Parameters for Port 0 */
 const cy_stc_pdstack_dpm_params_t pdstack_port0_dpm_params =
 {
-        .dpmSnkWaitCapPeriod = 350,
+        .dpmSnkWaitCapPeriod = 335,
         .dpmRpAudioAcc = CY_PD_RP_TERM_RP_CUR_DEF,
         .dpmDefCableCap = 300,
         .muxEnableDelayPeriod = 0,
@@ -56,6 +61,19 @@ const cy_stc_pdstack_dpm_params_t pdstack_port0_dpm_params =
         .defCur = 90
 };
 
+uint32_t gl_discIdResp[7] = {0xFF00A841, 0x184004B4, 0x00000000, 0xF5030000};
+
+/* App Parameters for Port 0 */
+const cy_stc_app_params_t port0_app_params =
+{
+    .appVbusPollAdcId = APP_VBUS_POLL_ADC_ID,
+    .appVbusPollAdcInput = APP_VBUS_POLL_ADC_INPUT,
+    .prefPowerRole = 2u, /* 0-Sink, 1-Source, 2-No Preference */
+    .prefDataRole = 2u, /* 0-UFP, 1- DFP, 2-No Preference */
+    .discIdResp = (cy_pd_pd_do_t *)&gl_discIdResp[0],
+    .discIdLen = 0x14,
+    .swapResponse = 0x3F
+};
 cy_stc_pdstack_context_t * gl_PdStackContexts[NO_OF_TYPEC_PORTS] =
 {
         &gl_PdStackPort0Ctx,
@@ -86,12 +104,40 @@ const cy_stc_sysint_t usbpd_port0_intr1_config =
     .intrPriority = 3U,
 };
 
+/*******************************************************************************
+* Function Name: get_pdstack_context
+********************************************************************************
+* Summary:
+*   Returns the respective port PD Stack Context
+*
+* Parameters:
+*  portIdx - Port Index
+*
+* Return:
+*  cy_stc_pdstack_context_t
+*
+*******************************************************************************/
 cy_stc_pdstack_context_t *get_pdstack_context(uint8_t portIdx)
 {
     return (gl_PdStackContexts[portIdx]);
 }
 
-/* Solution PD event handler */
+/*******************************************************************************
+* Function Name: sln_pd_event_handler
+********************************************************************************
+* Summary:
+*   Solution PD Event Handler
+*   Handles the Extended message event
+*
+* Parameters:
+*  ctx - PD Stack Context
+*  evt - App Event
+*  data - Data
+*
+* Return:
+*  None
+*
+*******************************************************************************/
 void sln_pd_event_handler(cy_stc_pdstack_context_t* ctx, cy_en_pdstack_app_evt_t evt, const void *data)
 {
     (void)ctx;
@@ -107,13 +153,40 @@ void sln_pd_event_handler(cy_stc_pdstack_context_t* ctx, cy_en_pdstack_app_evt_t
     }
 }
 
-void instrumentation_cb(uint8_t port, inst_evt_t evt)
+/*******************************************************************************
+* Function Name: instrumentation_cb
+********************************************************************************
+* Summary:
+*  Callback function for handling instrumentation faults
+*
+* Parameters:
+*  port - Port
+*  evt - Event
+*
+* Return:
+*  None
+*
+*******************************************************************************/
+void instrumentation_cb(uint8_t port, uint8_t evt)
 {
     uint8_t evt_offset = APP_TOTAL_EVENTS;
     evt += evt_offset;
     sln_pd_event_handler(&gl_PdStackPort0Ctx, (cy_en_pdstack_app_evt_t)evt, NULL);
 }
 
+/*******************************************************************************
+* Function Name: wdt_interrupt_handler
+********************************************************************************
+* Summary:
+*  Interrupt Handler for Watch Dog Timer
+*
+* Parameters:
+*  None
+*
+* Return:
+*  None
+*
+*******************************************************************************/
 static void wdt_interrupt_handler(void)
 {
     /* Clear WDT pending interrupt */
@@ -128,16 +201,55 @@ static void wdt_interrupt_handler(void)
     Cy_PdUtils_SwTimer_InterruptHandler(&(gl_TimerCtx));
 }
 
+/*******************************************************************************
+* Function Name: cy_usbpd0_intr0_handler
+********************************************************************************
+* Summary:
+*  Interrupt Handler for USBPD0 Interrupt 0
+*
+* Parameters:
+*  None
+*
+* Return:
+*  None
+*
+*******************************************************************************/
 static void cy_usbpd0_intr0_handler(void)
 {
     Cy_USBPD_Intr0Handler(&gl_UsbPdPort0Ctx);
 }
 
+/*******************************************************************************
+* Function Name: cy_usbpd0_intr1_handler
+********************************************************************************
+* Summary:
+*  Interrupt Handler for USBPD0 Interrupt 1
+*
+* Parameters:
+*  None
+*
+* Return:
+*  None
+*
+*******************************************************************************/
 static void cy_usbpd0_intr1_handler(void)
 {
     Cy_USBPD_Intr1Handler(&gl_UsbPdPort0Ctx);
 }
 
+/*******************************************************************************
+* Function Name: get_dpm_connect_stat
+********************************************************************************
+* Summary:
+*  Gets the DPM configuration for Port 0
+*
+* Parameters:
+*  None
+*
+* Return:
+*  cy_stc_pd_dpm_config_t
+*
+*******************************************************************************/
 cy_stc_pd_dpm_config_t* get_dpm_connect_stat(void)
 {
     return &(gl_PdStackPort0Ctx.dpmConfig);
@@ -149,25 +261,38 @@ cy_stc_pd_dpm_config_t* get_dpm_connect_stat(void)
  */
 const cy_stc_pdstack_app_cbk_t app_callback =
 {
-    app_event_handler,
-    vconn_enable,
-    vconn_disable,
-    vconn_is_present,
-    vbus_is_present,
-    vbus_discharge_on,
-    vbus_discharge_off,
-    psnk_set_voltage,
-    psnk_set_current,
-    psnk_enable,
-    psnk_disable,
-    eval_src_cap,
-    eval_dr_swap,
-    eval_pr_swap,
-    eval_vconn_swap,
-    eval_vdm,
-    vbus_get_value,
+    .app_event_handler = Cy_App_EventHandler,
+    .vconn_enable = Cy_App_VconnEnable,
+    .vconn_disable = Cy_App_VconnDisable,
+    .vconn_is_present = Cy_App_VconnIsPresent,
+    .vbus_is_present = Cy_App_VbusIsPresent,
+    .vbus_discharge_on = Cy_App_VbusDischargeOn,
+    .vbus_discharge_off = Cy_App_VbusDischargeOff,
+    .psnk_set_voltage = Cy_App_Sink_SetVoltage,
+    .psnk_set_current = Cy_App_Sink_SetCurrent,
+    .psnk_enable = Cy_App_Sink_Enable,
+    .psnk_disable = Cy_App_Sink_Disable,
+    .eval_src_cap = Cy_App_Pdo_EvalSrcCap,
+    .eval_dr_swap = Cy_App_Swap_EvalDrSwap,
+    .eval_pr_swap = Cy_App_Swap_EvalPrSwap,
+    .eval_vconn_swap = Cy_App_Swap_EvalVconnSwap,
+    .eval_vdm = Cy_App_Vdm_EvalVdmMsg,
+    .vbus_get_value = Cy_App_VbusGetValue
 };
 
+/*******************************************************************************
+* Function Name: app_get_callback_ptr
+********************************************************************************
+* Summary:
+*  Returns pointer to the structure holding the application callback functions
+*
+* Parameters:
+*  context - PD Stack Context
+*
+* Return:
+*  cy_stc_pdstack_app_cbk_t
+*
+*******************************************************************************/
 cy_stc_pdstack_app_cbk_t* app_get_callback_ptr(cy_stc_pdstack_context_t * context)
 {
     (void)context;
@@ -241,10 +366,10 @@ int main()
     __enable_irq();
 
     /* Initialize the instrumentation related data structures. */
-    instrumentation_init();
+    Cy_App_Instrumentation_Init(&gl_TimerCtx);
 
     /* Register callback function to be executed when instrumentation fault occurs. */
-    instrumentation_register_cb((instrumentation_cb_t)instrumentation_cb);
+    Cy_App_Instrumentation_RegisterCb((cy_app_instrumentation_cb_t)instrumentation_cb);
 
     /* Configure and enable the USBPD interrupts */
     Cy_SysInt_Init(&usbpd_port0_intr0_config, &cy_usbpd0_intr0_handler);
@@ -266,21 +391,24 @@ int main()
                        &gl_TimerCtx);
 
     /* Perform application level initialization. */
-    app_init(&gl_PdStackPort0Ctx);
+    Cy_App_Init(&gl_PdStackPort0Ctx, &port0_app_params);
+
 
     /* Initialize the fault configuration values */
-    fault_handler_init_vars(&gl_PdStackPort0Ctx);
+    Cy_App_Fault_InitVars(&gl_PdStackPort0Ctx);
+
 
     /* Start any timers or tasks associated with application instrumentation. */
-    instrumentation_start();
+    Cy_App_Instrumentation_Start();
 
     /* Start the device policy manager operation. This will initialize the USB-PD block and enable connect detection. */
     Cy_PdStack_Dpm_Start(&gl_PdStackPort0Ctx);
 
     /*
-     * After the initialization is complete, keep processing the USB-PD device policy manager task in a loop.
-     * Since this application does not have any other function, the PMG1 device can be placed in "deep sleep"
-     * mode for power saving whenever the PD stack and drivers are idle.
+     * After the initialization is complete, keep processing the USB-PD device
+     * policy manager task in a loop.  Since this application does not have any
+     * other function, the PMG1 device can be placed in "deep sleep" mode for
+     * power saving whenever the PD stack and drivers are idle.
      */
 
 
@@ -333,14 +461,14 @@ int main()
         Cy_PdStack_Dpm_Task(&gl_PdStackPort0Ctx);
 
         /* Perform any application level tasks. */
-        app_task(&gl_PdStackPort0Ctx);
+        Cy_App_Task(&gl_PdStackPort0Ctx);
 
         /* Perform tasks associated with instrumentation. */
-        instrumentation_task();
+        Cy_App_Instrumentation_Task();
 
     #if SYS_DEEPSLEEP_ENABLE /* Must be disabled during motor run */
         /* If possible, enter deep sleep mode for power saving. */
-        system_sleep(&gl_PdStackPort0Ctx, NULL);
+        Cy_App_SystemSleep(&gl_PdStackPort0Ctx, NULL);
 
     #endif /* SYS_DEEPSLEEP_ENABLE */
     }

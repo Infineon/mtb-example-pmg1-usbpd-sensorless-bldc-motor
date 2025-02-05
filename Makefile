@@ -7,7 +7,20 @@
 #
 ################################################################################
 # \copyright
-# $ Copyright 2022 Cypress Semiconductor Apache2 $
+# Copyright 2021-2024, Cypress Semiconductor Corporation (an Infineon company)
+# SPDX-License-Identifier: Apache-2.0
+# 
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+# 
+#     http://www.apache.org/licenses/LICENSE-2.0
+# 
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
 ################################################################################
 
 
@@ -77,7 +90,7 @@ VERBOSE=
 COMPONENTS=PMG1_PD3_SNK_EPR
 
 # Like COMPONENTS, but disable optional code that was enabled by default.
-DISABLE_COMPONENTS+=
+DISABLE_COMPONENTS=
 
 # By default the build system automatically looks in the Makefile's directory
 # tree for source code and builds it. The SOURCES variable can be used to
@@ -90,7 +103,9 @@ SOURCES=
 INCLUDES=
 
 # Add additional defines to the build process (without a leading -D).
-DEFINES=CY_PD_SINK_ONLY=1 CY_PD_REV3_ENABLE=1 VBUS_OVP_ENABLE=1 VBUS_UVP_ENABLE=0 SYS_DEEPSLEEP_ENABLE=0 CY_PD_EPR_ENABLE=1 BATTERY_CHARGING_ENABLE=1
+DEFINES=CY_PD_SINK_ONLY=1 CY_PD_REV3_ENABLE=1 VBUS_OVP_ENABLE=1 VBUS_UVP_ENABLE=0 \
+SYS_DEEPSLEEP_ENABLE=0 CY_PD_EPR_ENABLE=1 BATTERY_CHARGING_ENABLE=1 CY_PD_EPR_AVS_ENABLE=1 \
+MINOR_SVDM_VER_SUPPORT=1 CY_APP_ROLE_PREFERENCE_ENABLE=0 CY_APP_POWER_ROLE_PREFERENCE_ENABLE=0
 
 
 # Additional / custom C compiler flags.

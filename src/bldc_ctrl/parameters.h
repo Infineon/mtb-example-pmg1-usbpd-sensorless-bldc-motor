@@ -8,7 +8,7 @@
 * Related Document: See README.md
 *
 *******************************************************************************
-* Copyright 2023, Cypress Semiconductor Corporation (an Infineon company) or
+* Copyright 2025, Cypress Semiconductor Corporation (an Infineon company) or
 * an affiliate of Cypress Semiconductor Corporation.  All rights reserved.
 *
 * This software, including source code, documentation and related
@@ -147,7 +147,7 @@
  * macro for preposition
  *============================================================================*/
 /* default initial PWM duty cycle for pole alignment */
-#define PREPOSITION_PWM_DUTY                             ((uint16_t)(9))    /* 9% */
+#define PREPOSITION_PWM_DUTY                             ((uint16_t)(5))    /* 5% */
 
 /* Default initial PWM compare value for motor pre-position (alignment) */
 #define PREPOSITION_PWM_COMPARE                          ((uint16_t)(PREPOSITION_PWM_DUTY * PWM_PERIOD_CNT / 100))    /* 90 counts */
